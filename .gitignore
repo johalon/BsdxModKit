@@ -1,0 +1,7 @@
+_EXPORT_REPORT.md
+__pycache__/
+*.pyc
+*.pac
+*.class
+work/
+_ws/

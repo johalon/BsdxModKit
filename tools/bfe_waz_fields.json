@@ -1,0 +1,2991 @@
+{
+ "_meta": {
+  "source": "BaldrForce.exe (unprotected, 2003-01-12 build) editor dialogs + code",
+  "generator": "tools/gen_bfe_waz_fields.py",
+  "notes": "notes/07_bfe_exe_analysis.md",
+  "file_layouts": {
+   "waz": "u16 nSkill; skill_header(0x6C); phase(0x18C)×phase_count, each followed by spr_event(48)×n_events",
+   "tama": "Dat\\Waza\\Tama.dat = same as WAZ (弾 453 技)",
+   "cpu": "cpu_header(0x32); u16 nMove; cpu_move(96)×n; u16 nCombo; {4B, u16 n, cpu_attack(48)×n}×nCombo; u16 nCounter; cpu_counter(24)×n"
+  }
+ },
+ "structs": {
+  "skill_header": {
+   "size": 108,
+   "ja": "技ヘッダ (WAZA_BRAIN dlg113 / TAMA_BRAIN dlg118)",
+   "fields": [
+    {
+     "off": 0,
+     "type": "char[40]",
+     "name": "name",
+     "ja": "技名 (cp932, NUL 以降はゴミ)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 40,
+     "type": "u8",
+     "name": "group",
+     "ja": "技グループ",
+     "conf": "CONFIRMED",
+     "enum": "skill_group"
+    },
+    {
+     "off": 41,
+     "type": "u8",
+     "name": "kind",
+     "ja": "技タイプ (0=打撃→攻撃側の打撃威力, 1=射撃→射撃威力, 2=特殊)",
+     "conf": "CONFIRMED",
+     "enum": "skill_kind",
+     "note": "damage uses attacker +0x12 if kind!=0 else +0x0e (0x4423aa)"
+    },
+    {
+     "off": 42,
+     "type": "u16",
+     "name": "heat",
+     "ja": "消費OH (ヒート増加量; ゲージ最大 130)",
+     "conf": "CONFIRMED",
+     "note": "mech heat max = 0x82 (0x41b826)"
+    },
+    {
+     "off": 44,
+     "type": "u16",
+     "name": "max_hits",
+     "ja": "最大HIT数 (9999=無制限)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 46,
+     "type": "u16",
+     "name": "action_counter",
+     "ja": "総合行動カウンタ",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 48,
+     "type": "u16",
+     "name": "exp",
+     "ja": "EXP (次Lvまでの経験値; Lv3=0)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 50,
+     "type": "u8[2]",
+     "name": "pad32",
+     "ja": "pad (0xCC)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 52,
+     "type": "i32",
+     "name": "ai_distance",
+     "ja": "距離 (AI 用の間合い)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 56,
+     "type": "i32",
+     "name": "ai_height",
+     "ja": "高さ (AI 用)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 60,
+     "type": "bits8",
+     "name": "range_bits",
+     "ja": "距離 bit0=近 bit1=中 bit2=遠",
+     "conf": "CONFIRMED",
+     "bits": [
+      "近距離",
+      "中距離",
+      "遠距離"
+     ]
+    },
+    {
+     "off": 61,
+     "type": "bits8",
+     "name": "height_bits",
+     "ja": "高さ bit0=上 bit1=中 bit2=下",
+     "conf": "CONFIRMED",
+     "bits": [
+      "上",
+      "中",
+      "下"
+     ]
+    },
+    {
+     "off": 62,
+     "type": "u8[32]",
+     "name": "alg_list",
+     "ja": "アルゴリズムリスト = 実行するフェーズ番号の並び (99=終端)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 94,
+     "type": "struct:loop[4]",
+     "name": "loops",
+     "ja": "ループ情報×4 {終了位置, 開始位置, ループ数} (99=未使用)",
+     "conf": "CONFIRMED",
+     "note": "entry=3 bytes"
+    },
+    {
+     "off": 106,
+     "type": "u8",
+     "name": "phase_count",
+     "ja": "フェーズ数",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 107,
+     "type": "u8",
+     "name": "pad6b",
+     "ja": "pad",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "loop": {
+   "size": 3,
+   "ja": "ループ情報 (dlg162)",
+   "fields": [
+    {
+     "off": 0,
+     "type": "u8",
+     "name": "end",
+     "ja": "終了 (alg_list 上の位置)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 1,
+     "type": "u8",
+     "name": "start",
+     "ja": "開始",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "u8",
+     "name": "count",
+     "ja": "ループ数",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "calc_speed": {
+   "size": 15,
+   "ja": "計算（速度） dlg167",
+   "note": "pair = random range [min,max]; -32768 = keep current (runtime 0x440b70)",
+   "fields": [
+    {
+     "off": 0,
+     "type": "i16[2]",
+     "name": "init",
+     "ja": "初期値 [min,max] (<<8 して速度に)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i16[2]",
+     "name": "final",
+     "ja": "最終値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "i16[2]",
+     "name": "step",
+     "ja": "増分 (符号は初期→最終の向きに自動)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "i8",
+     "name": "rate_move",
+     "ja": "移 (補正率)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 13,
+     "type": "i8",
+     "name": "rate_hit",
+     "ja": "喰 (補正率)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 14,
+     "type": "i8",
+     "name": "rate_wind",
+     "ja": "風 (補正率)",
+     "conf": "LIKELY"
+    }
+   ]
+  },
+  "calc_dir": {
+   "size": 23,
+   "ja": "計算（移動方向／チップ方向） dlg168/169/178",
+   "note": "pair = random range [min,max]; -32768 = keep current (runtime 0x440b70); angle 0-360",
+   "fields": [
+    {
+     "off": 0,
+     "type": "u8",
+     "name": "type",
+     "ja": "移動タイプ/向きタイプ (radio)",
+     "conf": "CONFIRMED",
+     "enum": "dir_type"
+    },
+    {
+     "off": 1,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "フラグ (最短ﾙｰﾄ自動ﾁｪｯｸ, 常に方向ﾁｪｯｸ, ...)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "i16[2]",
+     "name": "init",
+     "ja": "初期値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 6,
+     "type": "i16[2]",
+     "name": "final",
+     "ja": "最終値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "i32[2]",
+     "name": "step",
+     "ja": "増分",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 20,
+     "type": "i8",
+     "name": "rate_move",
+     "ja": "移",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 21,
+     "type": "i8",
+     "name": "rate_hit",
+     "ja": "喰",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 22,
+     "type": "i8",
+     "name": "rate_wind",
+     "ja": "風",
+     "conf": "LIKELY"
+    }
+   ]
+  },
+  "calc_jump": {
+   "size": 23,
+   "ja": "計算（ジャンプ） dlg170: 二次関数 x 方式",
+   "note": "pair = random range [min,max]; -32768 = keep current (runtime 0x440b70) (runtime 0x440190)",
+   "fields": [
+    {
+     "off": 0,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "ﾊﾞｳﾝﾄﾞ(1/2)/最低高さを直値に/軌道をそのままに/高さ差分を強引に足す/上昇・下降ﾘﾐｯﾄ解除",
+     "conf": "CONFIRMED",
+     "bits": [
+      "ﾊﾞｳﾝﾄﾞ(1/2)",
+      "最低高さを直値に",
+      "軌道をそのままに",
+      "高さ差分を強引に足す",
+      "上昇下降ﾘﾐｯﾄ解除"
+     ]
+    },
+    {
+     "off": 1,
+     "type": "i8[2]",
+     "name": "x_start",
+     "ja": "二次関数の x 開始位置 = 初速 (<<8 → 縦速度 +0x304)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i16[2]",
+     "name": "dx_init",
+     "ja": "x の増分 初期値 (=重力)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "i16[2]",
+     "name": "dx_final",
+     "ja": "x の増分 最終値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "i16[2]",
+     "name": "dx_step",
+     "ja": "x の増分 増分",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 16,
+     "type": "i16[2]",
+     "name": "min_height",
+     "ja": "最低高さ差分",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 20,
+     "type": "i8",
+     "name": "rate_move",
+     "ja": "移",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 21,
+     "type": "i8",
+     "name": "rate_hit",
+     "ja": "喰",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 22,
+     "type": "i8",
+     "name": "rate_wind",
+     "ja": "風",
+     "conf": "LIKELY"
+    }
+   ]
+  },
+  "calc_zoom": {
+   "size": 14,
+   "ja": "計算（ズーム／拡大縮小） dlg172",
+   "note": "pair = random range [min,max]; -32768 = keep current (runtime 0x440b70); 256=等倍",
+   "fields": [
+    {
+     "off": 0,
+     "type": "u8",
+     "name": "type",
+     "ja": "タイプ 0=なし 1=処理する",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 1,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "フラグ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "i16[2]",
+     "name": "init",
+     "ja": "初期値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 6,
+     "type": "i16[2]",
+     "name": "final",
+     "ja": "最終値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 10,
+     "type": "i16[2]",
+     "name": "step",
+     "ja": "増分",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "calc_camera": {
+   "size": 8,
+   "ja": "計算（カメラ） dlg171",
+   "fields": [
+    {
+     "off": 0,
+     "type": "u8",
+     "name": "move",
+     "ja": "カメラ移動 0=変化なし 1=自分と標的の間へ 2=ヒット位置へ 3=自分の位置へ 4=敵の位置へ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 1,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "フラグ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "i16",
+     "name": "init",
+     "ja": "初期値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i16",
+     "name": "final",
+     "ja": "最終値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 6,
+     "type": "i16",
+     "name": "step",
+     "ja": "増分",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "calc_effect": {
+   "size": 6,
+   "ja": "計算（エフェクト） dlg173: Effect.spr のエフェクト生成",
+   "fields": [
+    {
+     "off": 0,
+     "type": "i16",
+     "name": "effect_no",
+     "ja": "エフェクト番号 (Bmp\\Effect\\Effect.spr のアニメ番号, -1=なし)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 2,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "フラグ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 3,
+     "type": "u8",
+     "name": "scale",
+     "ja": "出現規模",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i8",
+     "name": "rect_slot",
+     "ja": "判定番号 (SPR の判定スロットの位置に出す)",
+     "conf": "LIKELY"
+    }
+   ]
+  },
+  "hit": {
+   "size": 48,
+   "ja": "技：ヒット情報 dlg107 (WAZA_HIT)",
+   "fields": [
+    {
+     "off": 0,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "フラグ",
+     "conf": "CONFIRMED",
+     "bits": [
+      "ﾋｯﾄ中も高さ可変",
+      "鉄と鉄のぶつかるSE",
+      "ﾀﾞﾒｰｼﾞ大ﾎﾞｲｽ",
+      "装甲へのﾀﾞﾒｰｼﾞ2倍",
+      "HIT規模を全弾更新",
+      "ﾀﾞﾒｰｼﾞ処理をしない",
+      "全ﾋｯﾄ後装甲を維持",
+      "未定"
+     ],
+     "note": "bit3 doubles armor damage (0x44264f)"
+    },
+    {
+     "off": 1,
+     "type": "u8",
+     "name": "element",
+     "ja": "属性 0=無 1=炎 2=氷 3=雷",
+     "conf": "CONFIRMED",
+     "enum": "element"
+    },
+    {
+     "off": 2,
+     "type": "u8",
+     "name": "damage_type",
+     "ja": "ﾀﾞﾒｰｼﾞﾀｲﾌﾟ 0=NORMAL (1,2=未定)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i16",
+     "name": "power",
+     "ja": "威力",
+     "conf": "CONFIRMED",
+     "note": "dmg = power*P/10 - combo*P/10, P=攻撃側 打撃/射撃威力(既定10); then +heat bonus, *(100-防御力)/100 (0x44245d-0x442504)"
+    },
+    {
+     "off": 6,
+     "type": "i16",
+     "name": "min_power",
+     "ja": "最低威力 (ダメージ下限)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "i16",
+     "name": "combo_corr",
+     "ja": "ｺﾝﾎﾞ補正 (被弾側の補正蓄積 +0x110 に加算; 以降のヒットを減衰)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 10,
+     "type": "u8",
+     "name": "hit_wait",
+     "ja": "ﾋｯﾄｳｪｲﾄ (ヒットストップ; 振動時間の計算にも使用 0x441bb2)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 11,
+     "type": "u8",
+     "name": "hit_scale",
+     "ja": "HIT規模",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 12,
+     "type": "u8",
+     "name": "hits_mech",
+     "ja": "HIT数(ｷｬﾗ) 254=当たらない 255=無限",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 13,
+     "type": "u8",
+     "name": "hits_weapon",
+     "ja": "HIT数(兵器=弾) 254=当たらない 255=無限",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 14,
+     "type": "i16",
+     "name": "shake_scale",
+     "ja": "振動規模",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 16,
+     "type": "i16",
+     "name": "timer_explode",
+     "ja": "時限爆破",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 18,
+     "type": "i16",
+     "name": "se",
+     "ja": "効果音 (SE 表 index, -1=なし)",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 20,
+     "type": "u8",
+     "name": "ko_voice_rate",
+     "ja": "やられ声確率 %",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 22,
+     "type": "struct:calc_effect",
+     "name": "effect_mech",
+     "ja": "ヒットエフェクト：メカ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 28,
+     "type": "struct:calc_effect",
+     "name": "effect_weapon",
+     "ja": "ヒットエフェクト：弾",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 34,
+     "type": "struct:calc_zoom",
+     "name": "zoom",
+     "ja": "拡大縮小",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "noke": {
+   "size": 14,
+   "ja": "技：のけぞり情報 dlg164 (WAZA_NOKE)",
+   "fields": [
+    {
+     "off": 0,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "フラグ bit0=親速度>のけぞり速度",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 1,
+     "type": "u8",
+     "name": "direction",
+     "ja": "のけぞり方向 0=のけぞらない 1=自分→相手 2=自分の移動方向 3=自分の親→相手 4=大元のﾒｶ→相手",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "u8",
+     "name": "launch_accum",
+     "ja": "吹き飛び蓄積量 (被弾側 +0x30a に加算、100 以上で吹き飛び) 0x441db1",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 3,
+     "type": "i8",
+     "name": "noke_count",
+     "ja": "のけぞり回数",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 4,
+     "type": "i8",
+     "name": "move_hinder",
+     "ja": "移動妨害率 %",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 6,
+     "type": "i16",
+     "name": "speed_init",
+     "ja": "速度 初期値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "i16",
+     "name": "speed_final",
+     "ja": "速度 最終値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 10,
+     "type": "i16",
+     "name": "speed_step",
+     "ja": "速度 増分",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "i8",
+     "name": "launch",
+     "ja": "規模 (吹き飛びジャンプの二次関数 x = 初速、<<8) 0x441df3",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 13,
+     "type": "i8",
+     "name": "launch_down",
+     "ja": "規模(ダウン時) (ダウン中に当たった時の浮き)",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "fire": {
+   "size": 84,
+   "ja": "弾：発射情報 dlg119 (TAMA_FIRE) + 指定方向に発射 dlg174/179",
+   "fields": [
+    {
+     "off": 0,
+     "type": "i16",
+     "name": "tama",
+     "ja": "Tama.dat の技番号 (-1=なし)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "u8",
+     "name": "fire_type",
+     "ja": "発射ﾀｲﾌﾟ 0=弾(通常) 1=ﾚｰｻﾞｰ(通常) 2=ﾚｰｻﾞｰ(ｳﾈｳﾈ)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 3,
+     "type": "u8",
+     "name": "range_type",
+     "ja": "射程ﾀｲﾌﾟ 0=打撃 1=射撃",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i16",
+     "name": "se",
+     "ja": "発射効果音 (SE index, -1=なし)",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 6,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "フラグ bit0=壁あれば撃たない bit1=効果音確率1/2",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 7,
+     "type": "bits8",
+     "name": "flags2",
+     "ja": "各ﾌﾗｸﾞ (1発単位で更新(角度補正/ﾗﾝﾀﾞﾑ角度)、角度補正往復ﾙｰﾌﾟ …)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "u8",
+     "name": "dir_mode",
+     "ja": "発射方向 0=追尾 1=相対位置 2=絶対位置 3=前回の弾方向",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 13,
+     "type": "u8",
+     "name": "chip_dir",
+     "ja": "ﾁｯﾌﾟ向き 0=発射方向 1=標的方向 2=親方向",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 14,
+     "type": "i16",
+     "name": "loops",
+     "ja": "ループ数 / 最大出現数(179)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 16,
+     "type": "i16[3]",
+     "name": "count",
+     "ja": "同時発射数 初期/最終/増分",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 22,
+     "type": "i16[3]",
+     "name": "interval",
+     "ja": "発射間隔 初期/最終/増分",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 28,
+     "type": "i16[2]+i32",
+     "name": "angle_corr",
+     "ja": "角度補正 初期/最終/増分(i32 @0x20)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 36,
+     "type": "i16[2]+i32",
+     "name": "angle_rand",
+     "ja": "ﾗﾝﾀﾞﾑ角度 初期/最終/増分(i32 @0x28)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 44,
+     "type": "i16[2]+i32",
+     "name": "pos_corr",
+     "ja": "座標補正 初期/最終/増分(i32 @0x30)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 52,
+     "type": "i16[2]+i32",
+     "name": "height_corr",
+     "ja": "高さ補正 初期/最終/増分(i32 @0x38)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 60,
+     "type": "struct:target",
+     "name": "origin",
+     "ja": "発射位置 (標的計算)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 76,
+     "type": "struct:calc_effect",
+     "name": "muzzle_effect",
+     "ja": "発射位置ｴﾌｪｸﾄ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 82,
+     "type": "u8[2]",
+     "name": "pad",
+     "ja": "pad",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "shake": {
+   "size": 4,
+   "ja": "計算（振動） dlg175",
+   "fields": [
+    {
+     "off": 0,
+     "type": "u8",
+     "name": "where",
+     "ja": "振動させる個所 0=なし 1=初回 2=着地時 3=弾発射時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 1,
+     "type": "i8",
+     "name": "stop",
+     "ja": "停止時間",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "i8",
+     "name": "scale",
+     "ja": "振動規模",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 3,
+     "type": "u8",
+     "name": "pad",
+     "ja": "pad",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "blink": {
+   "size": 16,
+   "ja": "計算（残像） dlg186",
+   "fields": [
+    {
+     "off": 0,
+     "type": "u8",
+     "name": "type",
+     "ja": "タイプ 0=なし 1=ノーマル残像 2=色残像",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 1,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "フラグ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "i16[2]",
+     "name": "init",
+     "ja": "初期値 (R…)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 6,
+     "type": "i16[2]",
+     "name": "final",
+     "ja": "最終値",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 10,
+     "type": "i16[2]",
+     "name": "step",
+     "ja": "増分",
+     "conf": "LIKELY"
+    }
+   ]
+  },
+  "target": {
+   "size": 16,
+   "ja": "計算（標的） dlg176: ロック座標/発射位置",
+   "fields": [
+    {
+     "off": 0,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "ｚ軸は変更しない/判定ではなく座標差分を採用/処理しない",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 1,
+     "type": "u8",
+     "name": "type1",
+     "ja": "標的ﾀｲﾌﾟ① 0=判定 1=前回(更新) 2=自分 3=親 4-6=ﾛｯｸ座標1-3 7-10=弾(前/後/最初/最後) 11=大元のﾒｶ 12=現情報+相対 13=最も近いOBJ 14=ヒットした物体 15=発射目標(固定) 16=前回(非更新)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 2,
+     "type": "u8",
+     "name": "type2",
+     "ja": "標的ﾀｲﾌﾟ② (なし/親/ﾛｯｸ座標…)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 4,
+     "type": "i32",
+     "name": "depth1",
+     "ja": "階層の深さ①",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "i32",
+     "name": "depth2",
+     "ja": "階層の深さ②",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "u8[4]",
+     "name": "judge",
+     "ja": "判定設定 dlg177 (処理タイプ/判定スロット)",
+     "conf": "UNKNOWN"
+    }
+   ]
+  },
+  "phase": {
+   "size": 396,
+   "ja": "フェーズ (= アルゴリズム, WAZA_ALG_BRAIN dlg165); ファイル上は 0x18C=396 バイト",
+   "note": "go_* (変化先): -99=なし, 99=技終了, 0..n=フェーズ番号, -1=? (LIKELY 次へ). 通常は spr_event を全部再生し終えると alg_list の次へ進む",
+   "fields": [
+    {
+     "off": 0,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "各ﾌﾗｸﾞ",
+     "conf": "CONFIRMED",
+     "bits": [
+      "着地時煙出す",
+      "ﾐｻｲﾙ炎＆煙",
+      "装甲弾き→動き停止",
+      "浮遊状態維持",
+      "未定",
+      "ｽﾍﾟｼｬﾙ技演出",
+      "空ｷｬﾝｾﾙ",
+      "ｷｬﾝｾﾙﾌﾗｸﾞ初期化"
+     ]
+    },
+    {
+     "off": 1,
+     "type": "u8",
+     "name": "touch_mech_ally",
+     "ja": "接触: メカ(味方)",
+     "conf": "CONFIRMED",
+     "enum": "touch"
+    },
+    {
+     "off": 2,
+     "type": "u8",
+     "name": "touch_mech_enemy",
+     "ja": "接触: メカ(敵)",
+     "conf": "CONFIRMED",
+     "enum": "touch"
+    },
+    {
+     "off": 3,
+     "type": "u8",
+     "name": "touch_shot_ally",
+     "ja": "接触: 弾(味方)",
+     "conf": "CONFIRMED",
+     "enum": "touch"
+    },
+    {
+     "off": 4,
+     "type": "u8",
+     "name": "touch_shot_enemy",
+     "ja": "接触: 弾(敵)",
+     "conf": "CONFIRMED",
+     "enum": "touch"
+    },
+    {
+     "off": 5,
+     "type": "u8",
+     "name": "touch_obj",
+     "ja": "接触: OBJ",
+     "conf": "CONFIRMED",
+     "enum": "touch"
+    },
+    {
+     "off": 6,
+     "type": "u8",
+     "name": "touch_noentry",
+     "ja": "接触: 進禁",
+     "conf": "CONFIRMED",
+     "enum": "touch"
+    },
+    {
+     "off": 7,
+     "type": "u8",
+     "name": "touch_screen",
+     "ja": "接触: 画面端",
+     "conf": "CONFIRMED",
+     "enum": "touch"
+    },
+    {
+     "off": 8,
+     "type": "i8",
+     "name": "smoke_speed",
+     "ja": "煙出る速度",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 10,
+     "type": "i8",
+     "name": "go_air",
+     "ja": "変化(1回): 空中時 → フェーズ番号",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 11,
+     "type": "i8",
+     "name": "go_end",
+     "ja": "変化(1回): ｱﾙｺﾞﾘｽﾞﾑ終了時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "i8",
+     "name": "go_anim_end",
+     "ja": "変化(1回): ｽﾌﾟﾗｲﾄｱﾆﾒ終了時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 13,
+     "type": "i8",
+     "name": "go_hits_le_mech",
+     "ja": "変化(1回): 指定ﾋｯﾄ以下(ｷｬﾗ) [param @0x1A]",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 14,
+     "type": "i8",
+     "name": "go_hits_le_weapon",
+     "ja": "変化(1回): 指定ﾋｯﾄ以下(兵器) [param @0x1C]",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 15,
+     "type": "i8",
+     "name": "go_land",
+     "ja": "変化(随時): 地面着地時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 16,
+     "type": "i8",
+     "name": "go_obstacle",
+     "ja": "変化(随時): 障害物ヒット時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 17,
+     "type": "i8",
+     "name": "go_hit_mech",
+     "ja": "変化(随時): ｷｬﾗに指定ヒット時 [param @0x1E]",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 18,
+     "type": "i8",
+     "name": "go_hit_weapon",
+     "ja": "変化(随時): 兵器に指定ヒット時 [param @0x20]",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 19,
+     "type": "i8",
+     "name": "go_dist_in",
+     "ja": "変化(随時): 指定距離内時 [param @0x22]",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 20,
+     "type": "i8",
+     "name": "go_dist_out",
+     "ja": "変化(随時): 指定距離外時 [param @0x24]",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 21,
+     "type": "i8",
+     "name": "go_origin_null",
+     "ja": "変化(随時): 原点NULL時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 22,
+     "type": "i8",
+     "name": "go_mech_spr",
+     "ja": "変化(随時): ﾒｶｽﾌﾟﾗｲﾄNo変化時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 23,
+     "type": "i8",
+     "name": "go_mech_alg",
+     "ja": "変化(随時): ﾒｶｱﾙｺﾞNo変化時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 24,
+     "type": "i8",
+     "name": "go_mech_skill",
+     "ja": "変化(随時): ﾒｶ別技使用時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 25,
+     "type": "i8",
+     "name": "go_counter",
+     "ja": "変化(随時): 総合ｶｳﾝﾀ到達時",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 26,
+     "type": "i16",
+     "name": "p_hits_le_mech",
+     "ja": "param 指定ﾋｯﾄ以下(ｷｬﾗ)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 28,
+     "type": "i16",
+     "name": "p_hits_le_weapon",
+     "ja": "param 指定ﾋｯﾄ以下(兵器)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 30,
+     "type": "i16",
+     "name": "p_hit_mech",
+     "ja": "param ｷｬﾗに指定ヒット",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 32,
+     "type": "i16",
+     "name": "p_hit_weapon",
+     "ja": "param 兵器に指定ヒット",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 34,
+     "type": "i16",
+     "name": "p_dist_in",
+     "ja": "param 指定距離内",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 36,
+     "type": "i16",
+     "name": "p_dist_out",
+     "ja": "param 指定距離外",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 38,
+     "type": "struct:calc_speed",
+     "name": "speed",
+     "ja": "速度 (詳細設定ボタン 5702)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 56,
+     "type": "struct:calc_dir",
+     "name": "move_dir",
+     "ja": "移動方向 (5703)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 80,
+     "type": "struct:calc_dir",
+     "name": "chip_dir",
+     "ja": "チップ向き (5704 / ﾚｰｻﾞｰ用 5714)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 104,
+     "type": "struct:calc_jump",
+     "name": "jump",
+     "ja": "ジャンプ (5705)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 128,
+     "type": "struct:calc_zoom",
+     "name": "screen_zoom",
+     "ja": "画面拡縮 (5710)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 142,
+     "type": "struct:calc_camera",
+     "name": "camera",
+     "ja": "カメラ (5711)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 150,
+     "type": "struct:hit",
+     "name": "hit",
+     "ja": "ヒット (5706)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 198,
+     "type": "struct:noke",
+     "name": "noke_mech",
+     "ja": "のけぞり(ﾒｶ) (5707) ※被弾側メカへ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 212,
+     "type": "struct:noke",
+     "name": "noke_shot",
+     "ja": "のけぞり(弾) (5708)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 226,
+     "type": "struct:calc_effect",
+     "name": "effect_always",
+     "ja": "常時ｴﾌｪｸﾄ (1052)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 232,
+     "type": "struct:calc_effect",
+     "name": "effect_land",
+     "ja": "着地ｴﾌｪｸﾄ (1053)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 240,
+     "type": "struct:fire",
+     "name": "fire",
+     "ja": "弾発射 (5709)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 324,
+     "type": "struct:shake",
+     "name": "shake",
+     "ja": "振動 (5712)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 328,
+     "type": "struct:blink",
+     "name": "blink",
+     "ja": "残像 (5713)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 344,
+     "type": "struct:target",
+     "name": "lock1",
+     "ja": "ﾛｯｸ座標1(原点) (5700)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 360,
+     "type": "struct:target",
+     "name": "lock2",
+     "ja": "ﾛｯｸ座標2(移動目標) (5701)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 376,
+     "type": "struct:target",
+     "name": "lock3",
+     "ja": "ﾛｯｸ座標3(発射目標) (1789)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 392,
+     "type": "u8",
+     "name": "n_events",
+     "ja": "スプライトイベント数 (後続 48B×n)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 393,
+     "type": "u8[3]",
+     "name": "pad",
+     "ja": "pad (ゴミ)",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "spr_event": {
+   "size": 48,
+   "ja": "スプライト情報 dlg115 (SPR_BRAIN): フェーズ内で順番に再生",
+   "fields": [
+    {
+     "off": 0,
+     "type": "i16[2]",
+     "name": "wait",
+     "ja": "WAIT [min,max]: anim_type=0 なら区間フレーム数、=1 なら再生速度%",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i16",
+     "name": "anim",
+     "ja": "SPR アニメスロット (tooru.spr の 512 スロット)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 6,
+     "type": "i16",
+     "name": "anim_dash",
+     "ja": "ﾀﾞｯｼｭ時 に使う別アニメ (-1=なし)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 8,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "各ﾌﾗｸﾞ",
+     "conf": "CONFIRMED",
+     "bits": [
+      "影",
+      "地面にめりこむ",
+      "弾発射位置ﾛｯｸ",
+      "弾発射",
+      "高さ1/2しない影",
+      "どこにいてもHIT",
+      "未定",
+      "未定"
+     ]
+    },
+    {
+     "off": 9,
+     "type": "u8",
+     "name": "anim_type",
+     "ja": "ｱﾆﾒﾀｲﾌﾟ 0=指定ｳｪｲﾄに詰める 1=指定％増減させる 2=指定ｳｪｲﾄ間ﾙｰﾌﾟ 3=地面に着地するまで 4=弾を撃ち終わるまで",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 10,
+     "type": "u8",
+     "name": "dir_fix",
+     "ja": "方向修正 (0-99)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 12,
+     "type": "bits32",
+     "name": "attack_rects",
+     "ja": "攻撃判定 (この区間で有効な SPR 判定スロット)",
+     "conf": "CONFIRMED",
+     "bits": [
+      "下段1",
+      "下段2",
+      "中段1",
+      "中段2",
+      "中段3",
+      "中段4",
+      "中段5",
+      "上段1-1",
+      "上段1-2",
+      "上段2",
+      "上段3",
+      "火器1",
+      "火器2",
+      "火器3",
+      "火器4",
+      "未定"
+     ],
+     "note": "判定設定 dlg177 names SPR rect slots: 01下段1 02中段1 04上段1 05-08火器1-4 10下段2 11中段2 12上段2 16-18中段3-5 (bit→slot LIKELY)"
+    },
+    {
+     "off": 16,
+     "type": "i8",
+     "name": "armor_rate",
+     "ja": "装甲効果率 (>0: 装甲ゲージ減少=dmg/rate, <0: =|rate|*dmg; -99=壊れない) 0x442625",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 18,
+     "type": "i16",
+     "name": "attr",
+     "ja": "ｱﾄﾘﾋﾞｭｰﾄ (描画属性)",
+     "conf": "CONFIRMED",
+     "enum": "draw_attr"
+    },
+    {
+     "off": 20,
+     "type": "i16",
+     "name": "attr_value",
+     "ja": "ｱﾄﾘﾋﾞｭｰﾄ値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 22,
+     "type": "i16",
+     "name": "se_play",
+     "ja": "効果音 再生 (SE index, -1=なし)",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 24,
+     "type": "i8",
+     "name": "se_loop",
+     "ja": "効果音 ﾙｰﾌﾟ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 26,
+     "type": "i16",
+     "name": "se_stop",
+     "ja": "効果音 停止 (SE index)",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 28,
+     "type": "i8",
+     "name": "voice_kind",
+     "ja": "ボイス 種類 (BatVoice カテゴリ, -1=なし)",
+     "conf": "CONFIRMED",
+     "enum": "voice_category"
+    },
+    {
+     "off": 29,
+     "type": "i8",
+     "name": "voice_no",
+     "ja": "ボイス 指定 (カテゴリ内 0-3, -1=ランダム?)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 30,
+     "type": "u8",
+     "name": "voice_rate",
+     "ja": "ボイス発生確率 %",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 32,
+     "type": "struct:calc_zoom",
+     "name": "zoom",
+     "ja": "スプライト拡大縮小 (256=等倍)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 46,
+     "type": "u8[2]",
+     "name": "pad",
+     "ja": "pad",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "cpu_header": {
+   "size": 50,
+   "ja": "敵アルゴリズム作成 dlg138 / CPU ファイル先頭。値 = c1 + c2×CPUレベル",
+   "fields": [
+    {
+     "off": 0,
+     "type": "i16",
+     "name": "hp_bars",
+     "ja": "耐久力 c1 = 追加 HP ゲージ本数 (1本=2080, 最大7) 0x41b654",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "i16",
+     "name": "hp_bars_lv",
+     "ja": "耐久力 c2 (Lvごとの増分)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i16",
+     "name": "armor",
+     "ja": "装甲 c1 (装甲ゲージ; プレイヤー既定300)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 6,
+     "type": "i16",
+     "name": "armor_lv",
+     "ja": "装甲 c2",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "i16",
+     "name": "defense",
+     "ja": "防御力 c1 (被ダメージ -%)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 10,
+     "type": "i16",
+     "name": "defense_lv",
+     "ja": "防御力 c2",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "i16",
+     "name": "melee_pow",
+     "ja": "打撃：威力 c1 (既定10, 上限20)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 14,
+     "type": "i16",
+     "name": "melee_pow_lv",
+     "ja": "打撃：威力 c2",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 16,
+     "type": "i16",
+     "name": "melee_heat",
+     "ja": "打撃：ﾋｰﾄ率 c1 (%) (c2 は Lv ごとに減算)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 18,
+     "type": "i16",
+     "name": "melee_heat_lv",
+     "ja": "打撃：ﾋｰﾄ率 c2",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 20,
+     "type": "i16",
+     "name": "shot_pow",
+     "ja": "射撃：威力 c1",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 22,
+     "type": "i16",
+     "name": "shot_pow_lv",
+     "ja": "射撃：威力 c2",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 24,
+     "type": "i16",
+     "name": "shot_heat",
+     "ja": "射撃：ﾋｰﾄ率 c1",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 26,
+     "type": "i16",
+     "name": "shot_heat_lv",
+     "ja": "射撃：ﾋｰﾄ率 c2",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 28,
+     "type": "i16[2]",
+     "name": "money",
+     "ja": "入手金額",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 32,
+     "type": "u8",
+     "name": "mech_type",
+     "ja": "ﾒｶの型 0=ｽﾀﾝﾀﾞｰﾄﾞ 1=多脚型",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 34,
+     "type": "i16",
+     "name": "se_walk",
+     "ja": "歩行 SE (足音)",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 36,
+     "type": "i16",
+     "name": "se_dash1",
+     "ja": "ﾀﾞｯｼｭ1 SE (開始)",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 38,
+     "type": "i16",
+     "name": "se_dash2",
+     "ja": "ﾀﾞｯｼｭ2 SE (継続)",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 40,
+     "type": "i16",
+     "name": "se_dash3",
+     "ja": "ﾀﾞｯｼｭ3 SE (停止)",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 42,
+     "type": "i16",
+     "name": "se_sdash",
+     "ja": "Sﾀﾞｯｼｭ SE",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 44,
+     "type": "i16",
+     "name": "se_down",
+     "ja": "ﾀﾞｳﾝ SE",
+     "conf": "CONFIRMED",
+     "enum": "se"
+    },
+    {
+     "off": 46,
+     "type": "i16",
+     "name": "n_move",
+     "ja": "CPU移動 件数 (ファイル上は直後にもう一度 u16)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 48,
+     "type": "u8[2]",
+     "name": "pad",
+     "ja": "(ポインタ残骸)",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "cpu_cond": {
+   "size": 36,
+   "ja": "発動条件 dlg180 + メカ状態による発動条件 dlg181",
+   "fields": [
+    {
+     "off": 0,
+     "type": "u8",
+     "name": "priority",
+     "ja": "優先順位",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 1,
+     "type": "u8",
+     "name": "need_cpu_lv",
+     "ja": "必要CPUﾚﾍﾞﾙ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i32",
+     "name": "hp_le",
+     "ja": "指定HP以下で発動",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "i32[2]",
+     "name": "range",
+     "ja": "発動範囲 min～max",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 16,
+     "type": "i32[2]",
+     "name": "height",
+     "ja": "高さ範囲 min～max",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 24,
+     "type": "bits32",
+     "name": "self_state",
+     "ja": "条件(自分) メカ状態ビット",
+     "conf": "LIKELY",
+     "bits": [
+      "地上:停止",
+      "地上:歩行",
+      "地上:ﾀﾞｯｼｭ",
+      "地上:Sﾀﾞｯｼｭ",
+      "空中:停止",
+      "空中:歩行",
+      "空中:ﾀﾞｯｼｭ",
+      "空中:Sﾀﾞｯｼｭ",
+      "のけぞり",
+      "吹き飛び",
+      "ダウン",
+      "起き上がり"
+     ]
+    },
+    {
+     "off": 28,
+     "type": "bits32",
+     "name": "enemy_state",
+     "ja": "条件(敵)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 32,
+     "type": "i16",
+     "name": "prob",
+     "ja": "発動確率 (‰?)",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 34,
+     "type": "i16",
+     "name": "prob_cpu",
+     "ja": "発動確率CPU補正",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "cpu_move": {
+   "size": 96,
+   "ja": "CPU移動 dlg182 (ファイル: header の後 u16 n + 96B×n)",
+   "fields": [
+    {
+     "off": 0,
+     "type": "bits16",
+     "name": "flags",
+     "ja": "ﾌﾗｸﾞ ﾀﾞｯｼｭ硬直なし/標的随時ﾁｪｯｸ/位置加工随時ﾁｪｯｸ/方向±ﾗﾝﾀﾞﾑ/…/完全浮遊",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "u8",
+     "name": "type",
+     "ja": "ﾀｲﾌﾟ 0=停止 1=歩行 2=ﾀﾞｯｼｭ 3=ｼｮｰﾄﾀﾞｯｼｭ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 3,
+     "type": "u8",
+     "name": "target",
+     "ja": "標的 0=ﾗﾝﾀﾞﾑ位置 1=攻撃目標 2=味方",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i32",
+     "name": "target_var",
+     "ja": "標的 変数",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "u8",
+     "name": "pos_mod",
+     "ja": "位置加工 0=なし 1=回転",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "i32",
+     "name": "pos_var",
+     "ja": "位置加工 変数 (角度)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 16,
+     "type": "u8",
+     "name": "speed_type",
+     "ja": "速度 0=通常 1=慣性",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 20,
+     "type": "i32",
+     "name": "speed",
+     "ja": "移動速度",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 24,
+     "type": "i32",
+     "name": "inertia",
+     "ja": "慣性規模",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 28,
+     "type": "u8",
+     "name": "rise",
+     "ja": "上昇 0=しない 1=ジャンプ 2=浮遊",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 32,
+     "type": "i32[2]",
+     "name": "rise_var",
+     "ja": "上昇 変数1/2",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 40,
+     "type": "u8",
+     "name": "algo",
+     "ja": "移動ｱﾙｺﾞﾘｽﾞﾑ 0=通常 1=壁よけ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 44,
+     "type": "i32",
+     "name": "algo_var",
+     "ja": "移動ｱﾙｺﾞ 変数",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 48,
+     "type": "i16",
+     "name": "pre_wait",
+     "ja": "移動前の隙",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 50,
+     "type": "i16",
+     "name": "time",
+     "ja": "移動時間",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 52,
+     "type": "i16",
+     "name": "attack_prob",
+     "ja": "攻撃確率",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 56,
+     "type": "struct:cpu_cond",
+     "name": "cond",
+     "ja": "発動条件",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 92,
+     "type": "u8[4]",
+     "name": "end_cond",
+     "ja": "終了条件",
+     "conf": "UNKNOWN"
+    }
+   ]
+  },
+  "cpu_attack": {
+   "size": 48,
+   "ja": "CPU攻撃 dlg185 (コンボ1段)",
+   "fields": [
+    {
+     "off": 0,
+     "type": "bits8",
+     "name": "flags",
+     "ja": "bit?=動かなくする",
+     "conf": "LIKELY"
+    },
+    {
+     "off": 2,
+     "type": "i16",
+     "name": "skill",
+     "ja": "技番号 (WAZ index)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "i16",
+     "name": "cancel_when",
+     "ja": "いつｷｬﾝｾﾙさせる? 0=条件なし 1=敵着地後 2=自分着地後 3=ﾋｯﾄ後",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 6,
+     "type": "i16",
+     "name": "time",
+     "ja": "時間",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "i16",
+     "name": "cpu_lv_corr",
+     "ja": "CPUﾚﾍﾞﾙ補正値",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 10,
+     "type": "i16",
+     "name": "interrupt_prob",
+     "ja": "割り込ませ確率",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "struct:cpu_cond",
+     "name": "cond",
+     "ja": "発動条件",
+     "conf": "CONFIRMED"
+    }
+   ]
+  },
+  "cpu_combo": {
+   "size": null,
+   "ja": "CPUコンボリスト dlg184: {u8 割り込み可, u8, u16 n} + u16 n + cpu_attack×n",
+   "fields": []
+  },
+  "cpu_counter": {
+   "size": 24,
+   "ja": "反撃 dlg141 (ファイル末尾: u16 n + 24B×n)",
+   "fields": [
+    {
+     "off": 0,
+     "type": "u8",
+     "name": "type",
+     "ja": "ﾀｲﾌﾟ 0=何もしない 1=移動 2=技",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 2,
+     "type": "i16",
+     "name": "action",
+     "ja": "行動 (技番号/移動番号)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 4,
+     "type": "u8",
+     "name": "value",
+     "ja": "技の価値（優先順位）",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 5,
+     "type": "u8",
+     "name": "need_cpu_lv",
+     "ja": "必要CPUﾚﾍﾞﾙ",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 6,
+     "type": "i16",
+     "name": "prob",
+     "ja": "発動確率",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 8,
+     "type": "i16",
+     "name": "prob_lv",
+     "ja": "CPUﾚﾍﾞﾙ発動確率変化",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 10,
+     "type": "i16",
+     "name": "delay",
+     "ja": "出るまでの時間差",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 12,
+     "type": "i16",
+     "name": "delay_lv",
+     "ja": "CPUﾚﾍﾞﾙ時間差変化",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 14,
+     "type": "bits8",
+     "name": "attack_bits",
+     "ja": "攻撃: 打撃(下/中/上) 射撃(下/中/上)",
+     "conf": "CONFIRMED"
+    },
+    {
+     "off": 16,
+     "type": "bits16",
+     "name": "dist_bits",
+     "ja": "距離: 近/中/遠 × 横/下方/上空",
+     "conf": "LIKELY"
+    }
+   ]
+  }
+ },
+ "enums": {
+  "skill_group": [
+   "通常技",
+   "超技",
+   "回避技"
+  ],
+  "skill_kind": [
+   "打撃",
+   "射撃",
+   "特殊"
+  ],
+  "element": [
+   "無",
+   "炎",
+   "氷",
+   "雷"
+  ],
+  "touch": [
+   "重",
+   "通常",
+   "滑",
+   "無"
+  ],
+  "dir_type": [
+   "前回の設定",
+   "現在の進行方向",
+   "ﾛｯｸｵﾝした敵方向",
+   "壁避け",
+   "壁避け(敵ｻｰﾁ)",
+   "常に標的位置",
+   "先頭ﾚｰｻﾞｰ角度"
+  ],
+  "draw_attr": [
+   "ノーマル",
+   "左右反転",
+   "上下反転",
+   "半透明",
+   "100%加算",
+   "50%加算",
+   "25%加算",
+   "100%減算",
+   "50%減算",
+   "25%減算",
+   "タイルパターン",
+   "アルファブレンド",
+   "加算アルファ",
+   "塗りつぶし",
+   "フェード"
+  ],
+  "voice_category": [
+   "攻撃",
+   "回避",
+   "迎撃",
+   "超技使用",
+   "ﾀﾞﾒｰｼﾞ小",
+   "ﾀﾞﾒｰｼﾞ大",
+   "復帰時",
+   "戦闘開始時",
+   "勝利時",
+   "ＫＯ時",
+   "挑発",
+   "その他"
+  ],
+  "se": {
+   "_note": "Se\\<name>.wav (exe 0x4c9b24 \"SE\\%s.wav\"); table @0x4c7e88 stride 0x28 {char name[16], char desc[24]}; \"Ganbare\" = 空き",
+   "names": [
+    [
+     "Menu_Open",
+     "ﾒﾆｭｰOPEN"
+    ],
+    [
+     "Menu_Close",
+     "ﾒﾆｭｰCLOSE"
+    ],
+    [
+     "Menu_Sel",
+     "ﾒﾆｭｰSELECT"
+    ],
+    [
+     "Factory",
+     "工場"
+    ],
+    [
+     "Warning",
+     "ﾜｰﾆﾝｸﾞ"
+    ],
+    [
+     "Beep",
+     "ﾋﾞｰﾌﾟ音"
+    ],
+    [
+     "Stage",
+     "ｽﾃｰｼﾞ開始音"
+    ],
+    [
+     "force_max",
+     "ﾌｫｰｽｹﾞｰｼﾞMAX"
+    ],
+    [
+     "DeadBom",
+     "死亡爆破前音"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "System01",
+     "ｼｽﾃﾑ音01"
+    ],
+    [
+     "System02",
+     "ｼｽﾃﾑ音02"
+    ],
+    [
+     "System03",
+     "ｼｽﾃﾑ音03"
+    ],
+    [
+     "System04",
+     "ｼｽﾃﾑ音04"
+    ],
+    [
+     "System05",
+     "ｼｽﾃﾑ音05"
+    ],
+    [
+     "System06",
+     "ｼｽﾃﾑ音06"
+    ],
+    [
+     "System07",
+     "ｼｽﾃﾑ音07"
+    ],
+    [
+     "System08",
+     "ｼｽﾃﾑ音08"
+    ],
+    [
+     "System09",
+     "ｼｽﾃﾑ音09"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Hit01",
+     "ﾋｯﾄ小"
+    ],
+    [
+     "Hit02",
+     "ﾋｯﾄ中"
+    ],
+    [
+     "Hit03",
+     "ﾋｯﾄ大"
+    ],
+    [
+     "Hit04",
+     "ﾋｯﾄ大(ｴｺｰ)"
+    ],
+    [
+     "Hit05",
+     "ﾋｯﾄ多音1"
+    ],
+    [
+     "Hit06",
+     "ﾋｯﾄ多音2"
+    ],
+    [
+     "Hit07",
+     "ﾋｯﾄ多音3"
+    ],
+    [
+     "Hit08",
+     "ﾋｯﾄ多音4"
+    ],
+    [
+     "Hit09",
+     "ﾋｯﾄ多音5"
+    ],
+    [
+     "Ganbare",
+     "ﾋｯﾄ多音RND"
+    ],
+    [
+     "Landing",
+     "着地"
+    ],
+    [
+     "Down",
+     "ダウン"
+    ],
+    [
+     "Sp",
+     "超技発動"
+    ],
+    [
+     "Sousai1",
+     "相殺(ﾒｶ)"
+    ],
+    [
+     "Sousai2",
+     "相殺(弾)"
+    ],
+    [
+     "bom01",
+     "爆音01"
+    ],
+    [
+     "bom02",
+     "爆音02"
+    ],
+    [
+     "bom03",
+     "爆音03"
+    ],
+    [
+     "bom04",
+     "爆音04"
+    ],
+    [
+     "bom05",
+     "爆音05"
+    ],
+    [
+     "bom06",
+     "爆音06"
+    ],
+    [
+     "bom07",
+     "爆音07"
+    ],
+    [
+     "bom08",
+     "爆音08"
+    ],
+    [
+     "bom09",
+     "爆音09"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "kiru01",
+     "斬る01"
+    ],
+    [
+     "kiru02",
+     "斬る02"
+    ],
+    [
+     "kiru03",
+     "斬る03"
+    ],
+    [
+     "kiru04",
+     "斬る04"
+    ],
+    [
+     "kiru05",
+     "斬る05"
+    ],
+    [
+     "ninja2",
+     "忍者跳び"
+    ],
+    [
+     "syuriken",
+     "手裏剣着弾"
+    ],
+    [
+     "Down02",
+     "ダウン02"
+    ],
+    [
+     "Down03",
+     "ダウン03"
+    ],
+    [
+     "Down04",
+     "ダウン04"
+    ],
+    [
+     "field01",
+     "ﾌｨｰﾙﾄﾞ01"
+    ],
+    [
+     "field02",
+     "ﾌｨｰﾙﾄﾞ02"
+    ],
+    [
+     "field03",
+     "ﾌｨｰﾙﾄﾞ03"
+    ],
+    [
+     "field04",
+     "ﾌｨｰﾙﾄﾞ04"
+    ],
+    [
+     "field05",
+     "ﾌｨｰﾙﾄﾞ05"
+    ],
+    [
+     "field06",
+     "ﾌｨｰﾙﾄﾞ06"
+    ],
+    [
+     "field07",
+     "ﾌｨｰﾙﾄﾞ07"
+    ],
+    [
+     "field08",
+     "ﾌｨｰﾙﾄﾞ08"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "elec01",
+     "電撃01"
+    ],
+    [
+     "elec02",
+     "電撃02"
+    ],
+    [
+     "elec03",
+     "電撃03"
+    ],
+    [
+     "elec04",
+     "電撃04"
+    ],
+    [
+     "elec05",
+     "電撃05"
+    ],
+    [
+     "elec06",
+     "電撃06"
+    ],
+    [
+     "elec07",
+     "電撃07"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "tama01",
+     "発射01"
+    ],
+    [
+     "tama02",
+     "発射02"
+    ],
+    [
+     "tama03",
+     "発射03"
+    ],
+    [
+     "tama04",
+     "発射04"
+    ],
+    [
+     "tama05",
+     "発射05"
+    ],
+    [
+     "pistol",
+     "ﾋﾟｽﾄﾙ"
+    ],
+    [
+     "tama06",
+     "発射06"
+    ],
+    [
+     "tama07",
+     "発射07"
+    ],
+    [
+     "tama08",
+     "発射08"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "vulcan01",
+     "ﾊﾞﾙｶﾝ01"
+    ],
+    [
+     "vulcan02",
+     "ﾊﾞﾙｶﾝ02"
+    ],
+    [
+     "vulcan03",
+     "ﾊﾞﾙｶﾝ03"
+    ],
+    [
+     "vulcan04",
+     "ﾊﾞﾙｶﾝ04"
+    ],
+    [
+     "vulcan05",
+     "ﾊﾞﾙｶﾝ05"
+    ],
+    [
+     "vulcanG01",
+     "ﾊﾞﾙｶﾝ着弾01"
+    ],
+    [
+     "vulcanG02",
+     "ﾊﾞﾙｶﾝ着弾02"
+    ],
+    [
+     "vulcanG03",
+     "ﾊﾞﾙｶﾝ着弾03"
+    ],
+    [
+     "vulcanG04",
+     "ﾊﾞﾙｶﾝ着弾04"
+    ],
+    [
+     "Ganbare",
+     "ﾊﾞﾙｶﾝ着弾RND"
+    ],
+    [
+     "beam01",
+     "ﾋﾞｰﾑ01"
+    ],
+    [
+     "beam02",
+     "ﾋﾞｰﾑ02"
+    ],
+    [
+     "beam03",
+     "ﾋﾞｰﾑ03"
+    ],
+    [
+     "beam04",
+     "ﾋﾞｰﾑ04"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "musi",
+     "虫"
+    ],
+    [
+     "dash01",
+     "ﾀﾞｯｼｭ01"
+    ],
+    [
+     "dash02",
+     "ﾀﾞｯｼｭ02"
+    ],
+    [
+     "dash03",
+     "ﾀﾞｯｼｭ03"
+    ],
+    [
+     "dash04",
+     "ﾀﾞｯｼｭ04"
+    ],
+    [
+     "drill1",
+     "ﾄﾞﾘﾙ1"
+    ],
+    [
+     "drill2",
+     "ﾄﾞﾘﾙ2"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "attack01",
+     "攻撃01"
+    ],
+    [
+     "attack02",
+     "攻撃02"
+    ],
+    [
+     "attack03",
+     "攻撃03"
+    ],
+    [
+     "attack04",
+     "攻撃04"
+    ],
+    [
+     "attack05",
+     "攻撃05"
+    ],
+    [
+     "attack06",
+     "攻撃06"
+    ],
+    [
+     "attack07",
+     "攻撃07"
+    ],
+    [
+     "attack08",
+     "攻撃08"
+    ],
+    [
+     "pikiiin",
+     "攻撃09"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "se01",
+     "ｶﾁｯ"
+    ],
+    [
+     "se02",
+     "ﾋﾟﾋﾟｯ"
+    ],
+    [
+     "grass",
+     "草"
+    ],
+    [
+     "water1",
+     "ﾊﾞｼｬ"
+    ],
+    [
+     "water2",
+     "ﾊﾞｼｬｰﾝ"
+    ],
+    [
+     "kin1",
+     "弾き1"
+    ],
+    [
+     "kin2",
+     "弾き2"
+    ],
+    [
+     "kin3",
+     "弾き3"
+    ],
+    [
+     "Ganbare",
+     "弾きRND"
+    ],
+    [
+     "kati",
+     "ｶﾁﾁｯ"
+    ],
+    [
+     "biyon1",
+     "ﾋﾞﾖﾝ"
+    ],
+    [
+     "biyon2",
+     "ﾎﾞﾖｰﾝ"
+    ],
+    [
+     "fall1",
+     "ﾋｭｰﾝ"
+    ],
+    [
+     "fall2",
+     "ﾋﾟｭｰﾝ"
+    ],
+    [
+     "muti1",
+     "鞭"
+    ],
+    [
+     "muti2",
+     "鞭振り回し"
+    ],
+    [
+     "Catapira",
+     "ｷｬﾀﾋﾟﾗ"
+    ],
+    [
+     "muti3",
+     "鞭叩きつけ"
+    ],
+    [
+     "muti4",
+     "鞭4"
+    ],
+    [
+     "muti5",
+     "鞭5"
+    ],
+    [
+     "fire1",
+     "炎1"
+    ],
+    [
+     "fire2",
+     "炎2"
+    ],
+    [
+     "fire3",
+     "炎3"
+    ],
+    [
+     "fire4",
+     "炎4"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "Ganbare",
+     "----"
+    ],
+    [
+     "meka01",
+     "機械音01"
+    ],
+    [
+     "meka02",
+     "機械音02"
+    ],
+    [
+     "meka03",
+     "機械音03"
+    ],
+    [
+     "meka04",
+     "機械音04"
+    ],
+    [
+     "meka05",
+     "機械音05"
+    ],
+    [
+     "meka06",
+     "機械音06"
+    ],
+    [
+     "meka07",
+     "機械音07"
+    ],
+    [
+     "gatya",
+     "ｶﾞﾁｬ"
+    ],
+    [
+     "renSp",
+     "憐超技"
+    ],
+    [
+     "gatya2",
+     "ｶﾞﾁｬ"
+    ]
+   ]
+  }
+ },
+ "motions": {
+  "_note": "BFE hard-coded mech motions → SPR anim slot (exe 0x418000-0x41c200, 0x441d40-0x441fa0). ground/air chosen by height (obj+0x64)->+0x14 > 0. d = 方向区分 0前 1/2横 3後 (0x41a9f0, 敵との相対角).",
+  "move_states": {
+   "0": "停止",
+   "1": "歩行",
+   "2": "ダッシュ",
+   "3": "ダッシュ停止",
+   "4": "Sダッシュ(跳躍)",
+   "5": "空中/落下",
+   "6": "ダウン(寝)",
+   "7": "起き上がり",
+   "8": "演出(登場/退場?)",
+   "9": "演出",
+   "10": "演出",
+   "_src": "task2 handlers registered at 0x41bd21..0x41bdef; speeds set in 0x41a8c0: 歩行 8, ダッシュ 16, Sダッシュ 32 (×256 固定小数)"
+  },
+  "slots": [
+   {
+    "slot": 0,
+    "motion": "のけぞり(地上)",
+    "conf": "CONFIRMED",
+    "src": "0x441ef4"
+   },
+   {
+    "slot": 1,
+    "motion": "(未参照: のけぞり2?)",
+    "conf": "UNKNOWN"
+   },
+   {
+    "slot": 2,
+    "motion": "吹き飛び(打ち上げ)",
+    "conf": "CONFIRMED",
+    "src": "0x441f7c, 0x4410a9"
+   },
+   {
+    "slot": 3,
+    "motion": "(未参照)",
+    "conf": "UNKNOWN"
+   },
+   {
+    "slot": 4,
+    "motion": "ダウン(倒れ/寝)",
+    "conf": "CONFIRMED",
+    "src": "state6 0x41a096"
+   },
+   {
+    "slot": 5,
+    "motion": "起き上がり",
+    "conf": "CONFIRMED",
+    "src": "state7 0x41a15d"
+   },
+   {
+    "slot": 6,
+    "motion": "立ち(待機, 地上)",
+    "conf": "CONFIRMED",
+    "src": "state0 0x4191d8, battle init 0x41b8a4"
+   },
+   {
+    "slot": "7-10",
+    "motion": "歩行 4コマ周期 (7,8,9,10; 8 と 10 で足音)",
+    "conf": "CONFIRMED",
+    "src": "0x419766"
+   },
+   {
+    "slot": "11+3d",
+    "motion": "ダッシュ開始(地上) d=0前/1,2横/3後 → 11,14,17,20",
+    "conf": "CONFIRMED",
+    "src": "0x4199db"
+   },
+   {
+    "slot": "12+3d",
+    "motion": "ダッシュ中(地上) → 12,15,18,21",
+    "conf": "CONFIRMED"
+   },
+   {
+    "slot": "13+3d",
+    "motion": "ダッシュ停止(地上) → 13,16,19,22",
+    "conf": "CONFIRMED",
+    "src": "state3 0x419bc8"
+   },
+   {
+    "slot": 23,
+    "motion": "(未参照)",
+    "conf": "UNKNOWN"
+   },
+   {
+    "slot": 24,
+    "motion": "Sダッシュ/跳躍 踏み切り",
+    "conf": "LIKELY",
+    "src": "state4 0x419dcd"
+   },
+   {
+    "slot": 25,
+    "motion": "跳躍 上昇",
+    "conf": "LIKELY",
+    "src": "0x419ee1"
+   },
+   {
+    "slot": 26,
+    "motion": "空中待機(上昇中)/空中被弾",
+    "conf": "CONFIRMED",
+    "src": "0x419089, 0x441f98"
+   },
+   {
+    "slot": 27,
+    "motion": "空中待機(下降中)",
+    "conf": "CONFIRMED",
+    "src": "0x419264"
+   },
+   {
+    "slot": "28-31",
+    "motion": "着地バウンド (落下速度で 28..31 から開始) ",
+    "conf": "CONFIRMED",
+    "src": "0x4190a0, 0x4192a0"
+   },
+   {
+    "slot": "32-34",
+    "motion": "バウンド後の着地/ダウン移行 (速度区分)",
+    "conf": "LIKELY",
+    "src": "0x419349"
+   },
+   {
+    "slot": "35+3d",
+    "motion": "ダッシュ開始(空中) → 35,38,41,44",
+    "conf": "CONFIRMED"
+   },
+   {
+    "slot": "36+3d",
+    "motion": "ダッシュ中(空中) → 36,39,42,45",
+    "conf": "CONFIRMED"
+   },
+   {
+    "slot": "37+3d",
+    "motion": "ダッシュ停止(空中) → 37,40,43,46",
+    "conf": "CONFIRMED"
+   },
+   {
+    "slot": 48,
+    "motion": "練習モード(mode1)の被弾リアクション",
+    "conf": "LIKELY",
+    "src": "0x419605"
+   },
+   {
+    "slot": 50,
+    "motion": "ダウン中の追い打ち被弾",
+    "conf": "CONFIRMED",
+    "src": "0x441e43"
+   }
+  ]
+ },
+ "player_defaults": {
+  "_src": "0x41b582 (status type 0 = プレイヤー); CPU は cpu_header の c1+c2*Lv",
+  "hp_per_bar": 2080,
+  "hp_bars_extra": 2,
+  "hp_total": 6240,
+  "armor": 300,
+  "defense": 0,
+  "melee_power": 10,
+  "shot_power": 10,
+  "melee_heat_rate": 100,
+  "shot_heat_rate": 100,
+  "heat_max": 130,
+  "walk_speed": 8,
+  "dash_speed": 16,
+  "sdash_speed": 32,
+  "mech_type": 0,
+  "se": {
+   "walk": 40,
+   "dash1": 121,
+   "dash2": 122,
+   "dash3": 123,
+   "sdash": 124,
+   "down": 41
+  },
+  "meka_table": "exe .data 0x4c9b58 stride 0x214: char pilot[260], char file[260], u8 id, u8, u8 分類, u8, i16 cost(Hell?) @0x20c, u16 flags, u8 halfHP(1=ゲージ半分) @0x210, u8 得意間合い(1近2遠3全) @0x211, u8 @0x212, u8"
+ }
+}
