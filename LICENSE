@@ -21,6 +21,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 This license covers the code in this repository. The documents under docs/
-are licensed under CC BY 4.0 (see docs/LICENSE). BALDR SKY DiveX and
-BALDR FORCE EXE are copyrighted works of GIGA; this repository contains no
-game data.
+are licensed under CC BY 4.0 (see docs/LICENSE). The target game and the
+source game of the port are copyrighted works of their respective owners;
+this repository contains no game data.
